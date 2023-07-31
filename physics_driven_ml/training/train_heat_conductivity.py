@@ -15,9 +15,12 @@ from firedrake_adjoint import *
 from firedrake.ml.pytorch import torch_operator
 
 from physics_driven_ml.dataset_processing import PDEDataset, BatchedElement
-from physics_driven_ml.models import EncoderDecoder, CNN
+from physics_driven_ml.models import EncoderDecoder, CNN, ResNet
 from physics_driven_ml.utils import ModelConfig, get_logger
 from physics_driven_ml.evaluation import evaluate
+import matplotlib.pyplot as plt
+
+import numpy as np
 
 
 def train(model, config: ModelConfig,
@@ -29,13 +32,15 @@ def train(model, config: ModelConfig,
 
     max_grad_norm = 1.0
     best_error = 0.
-
+    loss_uk_values = []
+    loss_k_values = []
+    total_loss_values = []
+    
     # Training loop
     for epoch_num in trange(config.epochs):
         logger.info(f"Epoch num: {epoch_num}")
 
         model.train()
-
         total_loss = 0.0
         total_loss_uk = 0.0
         total_loss_k = 0.0
@@ -61,7 +66,7 @@ def train(model, config: ModelConfig,
             total_loss_k += loss_k.item()
 
             # Total loss
-            loss = loss_k + config.alpha * loss_uk
+            loss = loss_k +  loss_uk / config.alpha
             total_loss += loss.item()
 
             # Backprop and perform Adam optimisation
@@ -69,9 +74,13 @@ def train(model, config: ModelConfig,
             torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=max_grad_norm)
             optimiser.step()
 
+        
         logger.info(f"Total loss: {total_loss/train_steps}\
-                    \n\t Loss u(κ): {total_loss_uk/train_steps}  Loss κ: {total_loss_k/train_steps}")
+                    \n\t Loss u(κ): {total_loss_uk/train_steps/config.alpha}  Loss κ: {total_loss_k/train_steps}")
 
+        loss_uk_values.append((total_loss_uk / (train_steps*config.alpha)))
+        loss_k_values.append(total_loss_k / train_steps)
+        total_loss_values.append(total_loss / train_steps)
         # Evaluation on dev set
         error = evaluate(model, config, dev_dl, disable_tqdm=True)
         logger.info(f"Error ({config.evaluation_metric}): {error}")
@@ -91,6 +100,25 @@ def train(model, config: ModelConfig,
             torch.save(model_to_save.state_dict(), os.path.join(model_dir, "model.pt"))
             # Save training arguments together with the trained model
             config.to_file(os.path.join(model_dir, "training_args.json"))
+    
+    # plot_k = batch.target
+    # plot_u = batch.u_obs
+    # print("k,batch.target", plot_k)
+    # print("batch.u_obs", plot_u)
+    
+    # xaxis = [i for i in range(config.epochs)]
+    # plot image of loss
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(loss_uk_values, label="Loss u(κ)")
+    plt.plot(loss_k_values, label="Loss κ")
+    plt.plot(total_loss_values, label="Total Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss Value")
+    plt.title("Training Losses over Epochs")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
     return model
 
@@ -101,7 +129,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", default=os.environ["DATA_DIR"], type=str, help="Data directory")
     parser.add_argument("--model", default="cnn", type=str, help="one of [encoder-decoder, cnn]")
-    parser.add_argument("--alpha", default=1e4, type=float, help="Regularisation parameter")
+    parser.add_argument("--alpha", default=1e5, type=float, help="Regularisation parameter")
     parser.add_argument("--epochs", default=50, type=int, help="Epochs")
     parser.add_argument("--batch_size", default=1, type=int, help="Batch size")
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="Learning rate")
@@ -130,23 +158,65 @@ if __name__ == "__main__":
     mesh = train_dataset.mesh
     # Define function space and test function
     V = FunctionSpace(mesh, "CG", 1)
-    v = TestFunction(V)
-    # Define right-hand side
-    x, y = SpatialCoordinate(mesh)
-    with stop_annotating():
-        f = Function(V).interpolate(sin(pi * x) * sin(pi * y))
-    # Define Dirichlet boundary conditions
-    bcs = [DirichletBC(V, Constant(0.0), "on_boundary")]
+    V_vec = VectorFunctionSpace(mesh, "CG", 1)  # create a vector function space
+    x, y = SpatialCoordinate(V_vec.ufl_domain())
+    # Apply a random force as f which like heat source in "heat"
+    f_ramdon = as_vector([sin(pi * x) * sin(pi * y), sin(pi * x) * sin(pi * y)])
+    f = interpolate(f_ramdon, V_vec)
 
     # -- Define the Firedrake operations to be composed with PyTorch -- #
 
-    def solve_pde(k, u_obs, f, V, bcs):
-        """Solve Poisson problem"""
-        u = Function(V)
-        v = TestFunction(V)
-        F = (inner(exp(k) * grad(u), grad(v)) - inner(f, v)) * dx
-        # Solve PDE (using LU factorisation)
-        solve(F == 0, u, bcs=bcs, solver_parameters={'ksp_type': 'preonly', 'pc_type': 'lu'})
+    def solve_pde(k, u_obs, f, V):
+        # us = 0
+        # """Solve pde problem"""
+        # v, u_ = TestFunction(V_vec), TrialFunction(V_vec)
+        # u = Function(V_vec, name="Displacement")
+        # E = Constant(1.0)  # Young's modulus
+        # nu = Constant(0.2)
+
+        # # Lamé parameter
+        # lmbda = E*nu/(1+nu)/(1-2*nu)
+        # mu = E/2/(1+nu)
+        
+        # # Define strain and stress's formular
+        # def eps(v):
+        #     return sym(grad(v))
+        # def sig(v):
+        #     d = 2
+        #     return lmbda*tr(eps(v))*Identity(d) + 2*mu*eps(v)
+
+        # # Apply random_field as input strain in x, y, xy direction
+        # # Instead of store the tensor, I store the strain in each direction
+        # # Expand the number of random fields to three times original N to ensure that 
+        # # the number of strain fields generated is consistent with N.
+        
+        # # Define the displacement boundary conditions
+        # bc_expr = np.array([k[0] + k[2] * x, k[1] + k[2] * y])
+        # # Boundary conditions
+        # bcL = DirichletBC(V_vec, bc_expr, 1)
+        # bcR = DirichletBC(V_vec, bc_expr, 2)
+        # bcB = DirichletBC(V_vec, bc_expr, 3)
+        # bcT = DirichletBC(V_vec, bc_expr, 4)
+        # # Define variational problem using the principle of virtual work
+        # a = inner(sig(u_), eps(v)) * dx
+        # L = inner(f, v) * dx
+
+        # # Solve PDE
+        # solve(a == L, u, bcs=[bcL, bcB, bcR, bcT], solver_parameters={'ksp_type': 'preonly', 'pc_type': 'lu'})
+
+        # # Use the displacement to calculate the stress in each direction
+        # sxx = sig(u)[0, 0]
+        # syy = sig(u)[1, 1]
+        # sxy = sig(u)[0, 1]
+
+        # # Save the stress fields
+        # sigma = []
+        # sigma.append(sxx)
+        # sigma.append(syy)
+        # sigma.append(sxy)
+
+        # us.append(sigma)
+        u = u_obs
         # Assemble Firedrake L2-loss (and not l2-loss as in PyTorch)
         return assemble_L2_error(u, u_obs)
 
@@ -154,7 +224,7 @@ if __name__ == "__main__":
         """Assemble L2-loss"""
         return assemble(0.5 * (x - x_exact) ** 2 * dx)
 
-    solve_pde = functools.partial(solve_pde, f=f, V=V, bcs=bcs)
+    solve_pde = functools.partial(solve_pde, f=f, V=V)
 
     # -- Construct the Firedrake torch operators -- #
 
@@ -181,6 +251,8 @@ if __name__ == "__main__":
         model = EncoderDecoder(config)
     elif config.model == "cnn":
         model = CNN(config)
+    elif config.model == "resnet":
+        model = ResNet(config)
     else:
         raise ValueError(f"Unknown model: {config.model}")
 
@@ -192,3 +264,22 @@ if __name__ == "__main__":
     # -- Training -- #
 
     train(model, config=config, train_dl=train_dataloader, dev_dl=test_dataloader, G=G, H=H)
+
+    # print(f"Dataset length: {len(train_dataset)}")
+    # print(f"First data example: {train_dataset[0]}")
+    # from firedrake import plot
+    # import matplotlib.pyplot as plt
+
+    # # 假设 `batch.u_obs` 是一个二维矢量场，我们可以选择一个分量进行绘制。
+    # u_obs_firedrake = Function(V).assign(batch.u_obs)
+
+    # # 选择一个分量进行绘制。
+    # u_obs_component = u_obs_firedrake.sub(0)
+
+    # fig, axes = plt.subplots()
+    # axes.set_aspect('equal')
+    # contourf = plot(u_obs_component, axes=axes)
+    # fig.colorbar(contourf)
+    # plt.title("Heatmap of u_obs component")
+    # plt.show()
+
