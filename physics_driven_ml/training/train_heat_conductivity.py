@@ -15,7 +15,7 @@ from firedrake_adjoint import *
 from firedrake.ml.pytorch import torch_operator
 
 from physics_driven_ml.dataset_processing import PDEDataset, BatchedElement
-from physics_driven_ml.models import EncoderDecoder, CNN, ResNet
+from physics_driven_ml.models import EncoderDecoder, CNN
 from physics_driven_ml.utils import ModelConfig, get_logger
 from physics_driven_ml.evaluation import evaluate
 import matplotlib.pyplot as plt
