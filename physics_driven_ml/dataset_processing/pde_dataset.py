@@ -27,8 +27,6 @@ class PDEDataset(Dataset):
 
     def load_dataset(self, fname: str):
         data = []
-        k = []
-        u_obs = []
         # Load data
         with CheckpointFile(fname, "r") as afile:
             n = int(np.array(afile.h5pyfile["n"]))
@@ -36,45 +34,18 @@ class PDEDataset(Dataset):
             mesh = afile.load_mesh("mesh")
             # Load data
             for i in range(n):
-                # add k_xx, k_yy, k_xy as k
-                kxx= afile.load_function(mesh, "k_xx", idx=i)
-                kyy= afile.load_function(mesh, "k_yy", idx=i)
-                kxy= afile.load_function(mesh, "k_xy", idx=i)
-
-                k.append(kxx)
-                k.append(kyy)
-                k.append(kxy)
-
-                # add u_obs_xx, u_obs_yy, u_obs_xy as u_obs
-                u_obs_xx = afile.load_function(mesh, "u_obs_xx", idx=i)
-                u_obs_yy = afile.load_function(mesh, "u_obs_yy", idx=i)
-                u_obs_xy = afile.load_function(mesh, "u_obs_xy", idx=i)
-                u_obs.append(u_obs_xx)
-                u_obs.append(u_obs_yy)
-                u_obs.append(u_obs_xy)
-
+                k = afile.load_function(mesh, "k", idx=i)
+                u_obs = afile.load_function(mesh, "u_obs", idx=i)
                 data.append((k, u_obs))
         return mesh, data
 
     def __len__(self) -> int:
         return len(self.batch_elements_fd)
 
-    # def __getitem__(self, idx: int) -> BatchElement:
-    #     kxx_fd, kyy_fd, kxy_fd, u_obs_xx_fd, u_obs_yy_fd, u_obs_xy_fd = self.batch_elements_fd[idx]
-    #     # Convert Firedrake functions to PyTorch tensors
-    #     kxx, kyy, kxy, u_obs_xx, u_obs_yy, u_obs_xy = [to_torch(e) for e in [kxx_fd, kyy_fd, kxy_fd, u_obs_xx_fd, u_obs_yy_fd, u_obs_xy_fd]]
-    #     return BatchElement(kxx=kxx, kyy=kyy, kxy=kxy, u_obs_xx=u_obs_xx, u_obs_yy=u_obs_yy, u_obs_xy=u_obs_xy,
-    #                         kxx_fd=kxx_fd, kyy_fd=kyy_fd, kxy_fd=kxy_fd, u_obs_xx_fd=u_obs_xx_fd, u_obs_yy_fd=u_obs_yy_fd, u_obs_xy_fd=u_obs_xy_fd)
-
     def __getitem__(self, idx: int) -> BatchElement:
         target_fd, u_obs_fd = self.batch_elements_fd[idx]
         # Convert Firedrake functions to PyTorch tensors
-        # data -> k, u_obs -> kxx, kyy, kxy, u_obs_xx, u_obs_yy, u_obs_xy
-        for i in range(2):
-            for e in [target_fd[i], u_obs_fd[i]]:
-                target = to_torch(e)
-                u_obs = to_torch(e)
-        # target, u_obs = [to_torch(e) for e in [target_fd, u_obs_fd]]
+        target, u_obs = [to_torch(e) for e in [target_fd, u_obs_fd]]
         return BatchElement(target=target, u_obs=u_obs,
                             target_fd=target_fd, u_obs_fd=u_obs_fd)
 

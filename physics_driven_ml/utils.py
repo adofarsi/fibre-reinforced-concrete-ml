@@ -7,6 +7,10 @@ from dataclasses import dataclass
 @dataclass
 class ModelConfig:
 
+    # physics_params
+    E = 30e3
+    nu = 0.3
+    K_fold = 3
     # Directories
     data_dir: str = ""
     model_dir: str = ""
@@ -24,22 +28,24 @@ class ModelConfig:
 
     # Dataset
     dataset: str = "heat_conductivity"
-
+    save_folder = ''
+    best_model_name = ''
     # Optimisation
-    alpha: float = 1e-3
-    epochs: int = 100
+    alpha: float = 1e-22
+    epochs: int = 250
     batch_size: int = 1
     learning_rate: float = 1e-3
     evaluation_metric: str = "L2"
-
+    WEIGHT_DECAY = 5e-4
+    
     def __post_init__(self):
 
-        assert self.model in {"encoder-decoder", "cnn"}
+        assert self.model in {"encoder-decoder", "cnn", "mlp", "cnn1d", "rnn", "mlp_cohesive"}
 
-        if self.batch_size != 1:
-            # This can easily be implemented by using Firedrake ensemble parallelism.
-            # Ensemble parallelism is critical if the Firedrake operator composed with PyTorch is expensive to evaluate, e.g. when solving a PDE.
-            raise NotImplementedError("Batch size > 1 necessitates using Firedrake ensemble parallelism. See https://www.firedrakeproject.org/parallelism.html#ensemble-parallelism")
+        # if self.batch_size != 1:
+        #     # This can easily be implemented by using Firedrake ensemble parallelism.
+        #     # Ensemble parallelism is critical if the Firedrake operator composed with PyTorch is expensive to evaluate, e.g. when solving a PDE.
+        #     raise NotImplementedError("Batch size > 1 necessitates using Firedrake ensemble parallelism. See https://www.firedrakeproject.org/parallelism.html#ensemble-parallelism")
 
     def add_input_shape(self, input_shape: int):
         self.input_shape = input_shape
