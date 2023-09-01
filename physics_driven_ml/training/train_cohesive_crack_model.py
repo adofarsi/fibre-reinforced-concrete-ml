@@ -7,34 +7,35 @@ import torch.nn as nn
 import pandas as pd
 
 from physics_driven_ml.models.mlp_cohesive import MLP_cohesive_model
-from physics_driven_ml.models.rnn import RNN_model
-from physics_driven_ml.models.cnn1d import CNN1D_model
+from physics_driven_ml.models.rnn_cohesive import RNN_model
+from physics_driven_ml.models.cnn1d_cohesive import CNN1D_cohesive_model
 from physics_driven_ml.utils import ModelConfig
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm, trange
 
 WEIGHT_DECAY = 0.001  # Regularization strength
 
+
 def train_cross_validation(model, config, dataset, k_folds, epochs, batch_size, lr, criterion):
     kfold = KFold(n_splits=k_folds, shuffle=True)
     train_losses = []
     val_losses = []
-    
+
     for fold, (train_ids, val_ids) in enumerate(kfold.split(dataset)):
         print(f"Fold {fold+1}/{k_folds}")
-        
+
         # Define data subsets for training and validation
         train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
         val_subsampler = torch.utils.data.SubsetRandomSampler(val_ids)
-        
+
         train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampler=train_subsampler)
         val_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampler=val_subsampler)
-        
+
         # Re-initialize model for each fold
         model_fold = model(config)
-        
+
         optimizer_fold = optim.Adam(model_fold.parameters(), lr=config.learning_rate, weight_decay=config.WEIGHT_DECAY)
-        
+
         # model.to(config.device)
 
         # Training loop for each fold
@@ -80,6 +81,7 @@ def train_cross_validation(model, config, dataset, k_folds, epochs, batch_size, 
     plt.grid(True)
     plt.show()
 
+
 if __name__ == '__main__':
     # load data
     train_data = pd.read_csv('../../data/datasets/cohesive_crack_data/cohesive_crack.csv', header=1, names=["sigx", "RF", "CMOD", "disp", "steps"])
@@ -89,7 +91,7 @@ if __name__ == '__main__':
     test_data['E'] = 20e3
     test_data['nu'] = 0.2
 
-    noise_level = 0.001  # 调整噪音水平
+    noise_level = 0.001  # adjust this to change the noise level
     train_data['E'] = train_data['E'] * (1 + noise_level * np.random.randn(train_data.shape[0]))
     train_data['nu'] = train_data['nu'] * (1 + noise_level * np.random.randn(train_data.shape[0]))
     test_data['E'] = test_data['E'] * (1 + noise_level * np.random.randn(test_data.shape[0]))
@@ -110,7 +112,6 @@ if __name__ == '__main__':
     X_test_standardized = (X_test_tensor - X_mean) / X_std
     y_test_standardized = (y_test_tensor - y_mean) / y_std
 
-
     # Initialize the device for training
     config = ModelConfig()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -130,7 +131,7 @@ if __name__ == '__main__':
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, shuffle=False)
     config.save_folder = '../../saved_models'
-    config.best_model_name = 'cohesive_model.pth'
+    config.best_model_name = 'cohesive_model.pt'
     # Using the function:
     combined_dataset = torch.utils.data.ConcatDataset([train_dataset, test_dataset])
     train_cross_validation(MLP_cohesive_model, config, combined_dataset, k_folds=2, epochs=EPOCHS, batch_size=BATCH_SIZE, lr=LEARNING_RATE, criterion=criterion)

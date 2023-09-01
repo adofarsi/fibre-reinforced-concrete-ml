@@ -10,20 +10,16 @@ from physics_driven_ml.models.rnn import RNN_model
 from physics_driven_ml.models.cnn1d import CNN1D_model
 from physics_driven_ml.utils import ModelConfig
 import matplotlib.pyplot as plt
-from tqdm.auto import tqdm, trange
-
-from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from firedrake import *
 from firedrake_adjoint import *
-from firedrake.ml.pytorch import torch_operator
-
-from physics_driven_ml.evaluation import evaluate
 
 WEIGHT_DECAY = 0.001  # Regularization strength
 
+
 def solve_pde(input_data):
-    #print(input_data)
+    # print(input_data)
     input_data = input_data * X_std + X_mean
     E = input_data[0][0]
     nu = input_data[0][1]
@@ -33,7 +29,7 @@ def solve_pde(input_data):
     mu = E/2/(1+nu)
     # lmbda*tr(eps(v))*Identity(d) + 2*mu*eps(v), 0.1 is the trace of eps(v)
     s = lmbda*np.trace(strain_tensor)*np.eye(2) + 2*mu*strain_tensor
-    output = torch.tensor([s[0,0], s[1,1], s[0,1]], dtype=torch.float32)
+    output = torch.tensor([s[0, 0], s[1, 1], s[0, 1]], dtype=torch.float32)
     stress = (output - y_mean) / y_std
     return stress
 
@@ -41,26 +37,26 @@ def solve_pde(input_data):
 def train_phy(model, config: ModelConfig, dataset, solver):
     """Train the model on a given dataset."""
     criterion = nn.MSELoss()
-    
+
     best_error = 0.
     kfold = KFold(n_splits=config.K_fold, shuffle=True)
     train_losses = []
     val_losses = []
     for fold, (train_ids, val_ids) in enumerate(kfold.split(dataset)):
         print(f"Fold {fold+1}/{config.K_fold}")
-        
+
         # Define data subsets for training and validation
         train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
         val_subsampler = torch.utils.data.SubsetRandomSampler(val_ids)
-        
+
         train_loader = torch.utils.data.DataLoader(dataset, batch_size=config.batch_size, sampler=train_subsampler)
         val_loader = torch.utils.data.DataLoader(dataset, batch_size=config.batch_size, sampler=val_subsampler)
-        
+
         # Re-initialize model for each fold
         # model = model()
         model.to(config.device)
         optimizer_fold = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.WEIGHT_DECAY)
-        
+
         # training loop
         loss_phy_total = 0.0
         loss_ml_total = 0.0
@@ -72,7 +68,7 @@ def train_phy(model, config: ModelConfig, dataset, solver):
                 inputs, targets = inputs, targets
                 optimizer_fold.zero_grad()
                 outputs = model(inputs)                
-                
+
                 # calculate machine learning loss
                 loss_ml = criterion(outputs, targets)
                 loss_ml_total += loss_ml
@@ -80,14 +76,14 @@ def train_phy(model, config: ModelConfig, dataset, solver):
                 output_phy = solver(inputs)
                 loss_phi = criterion(output_phy, targets)  
                 loss_phy_total += loss_phi                
-                
+
                 # back propagation
                 loss = 0.1 * loss_phi + loss_ml
                 loss.backward()
-                
+
                 optimizer_fold.step()
                 current_train_loss += loss.item()
-                
+
             # validation loop
             model.eval()
             current_val_loss = 0.0
@@ -97,7 +93,7 @@ def train_phy(model, config: ModelConfig, dataset, solver):
                     outputs = model(inputs)
                     loss = criterion(outputs, targets)
                     current_val_loss += loss.item()
-            
+
             # print current losses
             train_losses.append(current_train_loss/len(train_loader))
             val_losses.append(current_val_loss/len(val_loader))
@@ -109,7 +105,7 @@ def train_phy(model, config: ModelConfig, dataset, solver):
                 best_error = current_val_loss
                 torch.save(model.state_dict(), os.path.join(config.save_folder, config.best_model_name))
     # plot losses
-    plt.figure(figsize=(12,4))
+    plt.figure(figsize=(12, 4))
     plt.plot(train_losses, label='Train Loss', color='blue')
     plt.plot(val_losses, label='Validation Loss', color='red')
     plt.title('Training and Validation Losses over Epochs')
@@ -117,9 +113,10 @@ def train_phy(model, config: ModelConfig, dataset, solver):
     plt.ylabel('Loss')
     plt.legend()
     plt.grid(True)
-    plt.show()    
+    plt.show()
 
     return model
+
 
 if __name__ == '__main__':
     # load data
@@ -146,8 +143,6 @@ if __name__ == '__main__':
     X_test_standardized = (X_test_tensor - X_mean) / X_std
     y_test_standardized = (y_test_tensor - y_mean) / y_std
 
-
-
     # args = parser.parse_args()
     config = ModelConfig()
     config.batch_size = 16
@@ -156,7 +151,7 @@ if __name__ == '__main__':
 
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=config.batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=config.batch_size, shuffle=False)
-    #save_folder = 'saved_models'
+    # save_folder = 'saved_models'
 
     config.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     config.save_folder = '../../saved_models'

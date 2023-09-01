@@ -10,30 +10,31 @@ from physics_driven_ml.models.rnn import RNN_model
 from physics_driven_ml.models.cnn1d import CNN1D_model
 from physics_driven_ml.utils import ModelConfig
 import matplotlib.pyplot as plt
-from tqdm.auto import tqdm, trange
+from tqdm.auto import tqdm
 
 WEIGHT_DECAY = 0.001  # Regularization strength
+
 
 def train_cross_validation(model, dataset, k_folds, epochs, batch_size, lr, criterion, save_folder):
     kfold = KFold(n_splits=k_folds, shuffle=True)
     train_losses = []
     val_losses = []
-    
+
     for fold, (train_ids, val_ids) in enumerate(kfold.split(dataset)):
         print(f"Fold {fold+1}/{k_folds}")
-        
+
         # Define data subsets for training and validation
         train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
         val_subsampler = torch.utils.data.SubsetRandomSampler(val_ids)
-        
+
         train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampler=train_subsampler)
         val_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampler=val_subsampler)
-        
+
         # Re-initialize model for each fold
         model_fold = model
-        
+
         optimizer_fold = optim.Adam(model_fold.parameters(), lr=lr, weight_decay=WEIGHT_DECAY)
-        
+
         # Training loop for each fold
         for epoch in tqdm(range(epochs)):
             model_fold.train()
@@ -46,7 +47,7 @@ def train_cross_validation(model, dataset, k_folds, epochs, batch_size, lr, crit
                 loss.backward()
                 optimizer_fold.step()
                 current_train_loss += loss.item()
-                
+
             current_val_loss = 0.0
             model_fold.eval()
             with torch.no_grad():
@@ -55,10 +56,10 @@ def train_cross_validation(model, dataset, k_folds, epochs, batch_size, lr, crit
                     outputs = model_fold(inputs)
                     loss = criterion(outputs, targets)
                     current_val_loss += loss.item()
-            
+
             train_losses.append(current_train_loss/len(train_loader))
             val_losses.append(current_val_loss/len(val_loader))
-            
+
             if epoch == epochs - 1:
                 print(f"Train Loss: {train_losses[-1]:.4f}, Val Loss: {val_losses[-1]:.4f}")
             # Save model if the validation loss has decreased
@@ -76,6 +77,7 @@ def train_cross_validation(model, dataset, k_folds, epochs, batch_size, lr, crit
     plt.legend()
     plt.grid(True)
     plt.show()
+
 
 if __name__ == '__main__':
     # load data
@@ -126,6 +128,3 @@ if __name__ == '__main__':
     # Using the function:
     combined_dataset = torch.utils.data.ConcatDataset([train_dataset, test_dataset])
     train_cross_validation(model, combined_dataset, k_folds=2, epochs=EPOCHS, batch_size=BATCH_SIZE, lr=LEARNING_RATE, criterion=criterion, save_folder=config.save_folder)
-
-    import matplotlib.pyplot as plt
-
