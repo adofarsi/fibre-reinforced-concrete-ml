@@ -40,7 +40,7 @@ class ModelConfig:
     
     def __post_init__(self):
 
-        assert self.model in {"encoder-decoder", "cnn", "mlp", "cnn1d", "rnn", "mlp_cohesive"}
+        assert self.model in {"encoder-decoder", "cnn", "mlp", "cnn1d", "rnn", "mlp_cohesive", "rnn_cohesive", "cnn1d_cohesive"}
 
         # if self.batch_size != 1:
         #     # This can easily be implemented by using Firedrake ensemble parallelism.
