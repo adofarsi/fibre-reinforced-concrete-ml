@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: physics-driven-ml
+Version: 1.0
+Summary: Physics-driven machine learning using the Firedrake and PyTorch libraries
+Author: Nacime Bouziani
+Author-email: n.bouziani18@imperial.ac.uk
+License-File: LICENSE
