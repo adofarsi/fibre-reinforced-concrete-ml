@@ -4,11 +4,10 @@ import firedrake as fd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .utilis import mesh2d_rectangle, cell_project, facet_project
+from utilis import mesh2d_rectangle, cell_project, facet_project
 
 
 def elastic_triaxial_synthetic_data(confining_pressures=[.5e6, 1e6, 2e6, 3e6]):
-    
     pass
 
 def cohesive_triaxial_curves(confining_pressure=1e6,
@@ -280,6 +279,108 @@ def elastic_triaxial_curves(confining_pressure=1e6,
         plt.ylabel('Stress [MPa]')
         plt.title(f'Confinement {confinement.values()[0]/1e6} MPa')
         plt.legend()
-    
-    
+
+
     return np.vstack([axial_stress, axial_strain, radial_strain])
+
+
+def elastic_forward(sigma_pred, confining_pressure=1e6,
+                    maximum_differential_stress=30e6,
+                    number_of_iterations=100,
+                    sample_width=.05,
+                    sample_height=.1,
+                    mesh_size=.0025,
+                    youngs_modulus=20e9,
+                    poissons_ratio=.25):
+    """"Describe the Firedrake operations for the elastic forward model:
+        confining_pressures= [1e6, 2e6, 3e6, 4e6]
+        dataset(cp_i(0-3), ra_i(0-1), time_i(0-99))
+
+        Dataset: (cp_i, rs_i^n, as_i^n)_{i, n}
+        Architecture:
+            For each cp_i in dataset:
+                ℒ = 0
+                For each time step n:
+                    u_n -> [Compute strain] -> ϵ_n -> [ML model] -> σ -> [Solve PDE for cp_i]
+                                                                                   |
+                                                                                   v
+                      ℒ_n <- [Loss] <- S_n <- [Compute radial/axial strains] <-  u_(n+1)
+                    # Accumulate loss
+                    ℒ += ℒ_n
+                # Backpropagate through the loss, which involves backpropagating
+                # through all the operations (solving PDE, computing strain/stress)
+                # for each time step.
+                ℒ.backward()
+
+        where ℒ_n(S_n) = 0.5 * ||ϵS - ϵS_exact||_{L2}**2 + 0.5 * ||ϵA_{i} - ϵA_exact||_{L2}**2
+        and with S_n = (ϵS, ϵA)
+    """
+    # Create mesh with Gmsh
+    mesh = mesh2d_rectangle(sample_width, sample_height, mesh_size)
+
+    # Define function spaces
+    V_u = fd.VectorFunctionSpace(mesh, "CG", 1)  # space for discontinuous displacement
+    V_0 = fd.FunctionSpace(mesh, "DG", 0)  # space for piecewise constant material properties
+    n = fd.FacetNormal(mesh)
+    # Define fields
+    u = fd.Function(V_u, name="Displacement")
+    u_, du = fd.TestFunction(V_u), fd.TrialFunction(V_u)
+    sigma_x = fd.Function(V_0, name="Sigma x")
+    sigma_y = fd.Function(V_0, name="Sigma y")
+    sigma_xy = fd.Function(V_0, name="Sigma xy")
+    # Assigning material properties
+    E_list = {1: youngs_modulus}
+    E = cell_project(E_list, V_0)
+    nu_list = {1: poissons_ratio}
+    nu = cell_project(nu_list, V_0)
+    lmbda = E*nu/(1+nu)/(1-2*nu)
+    mu = E/2/(1+nu)
+     # Constitutive law
+    def eps(v):
+        return fd.sym(fd.grad(v))
+    def sigma(v):
+        d = mesh.geometric_dimension()
+        return lmbda*fd.tr(eps(v))*fd.Identity(d) + 2*mu*eps(v)
+    # Boundary conditions
+    # Dirichlet BC
+    bottom_BC = fd.DirichletBC(V_u.sub(1), fd.Constant(0), 3)
+    right_BC = fd.DirichletBC(V_u.sub(0), fd.Constant(0), 2)
+    # Neumann BC
+    confinement = fd.Constant(confining_pressure)
+    axial_imposed_stress = fd.Constant(0)
+    left_BC = (confinement) * fd.dot(n,u_)*fd.ds((1))
+    top_BC = (confinement + axial_imposed_stress) * fd.dot(n,u_)*fd.ds((4))
+
+    # Define variational problem
+    F = fd.inner(sigma(u), eps(u_))*fd.dx +\
+        top_BC + left_BC
+ 
+    # Create a linear solver object
+    nonlin_problem = fd.NonlinearVariationalProblem(F, u, bcs=[bottom_BC, right_BC])
+    nonlin_solver = fd.NonlinearVariationalSolver(nonlin_problem)
+    # compute the size for the stress increment of each iteration
+    axial_stress_increment = maximum_differential_stress / number_of_iterations
+ 
+    # Initialize lists for storing results
+    axial_stress = [fd.Constant(0., domain=mesh)]
+    axial_strain = [fd.Constant(0., domain=mesh)]
+    radial_strain = [fd.Constant(0., domain=mesh)]
+    radial_stress = [fd.Constant(0., domain=mesh)]
+    # Start iterations
+    for _ in range(number_of_iterations):
+        # Update boundary conditions
+        axial_imposed_stress.assign(axial_imposed_stress + axial_stress_increment)
+        # Solve
+        nonlin_solver.solve()
+        # Update stress fields
+        sigma_x.assign(fd.interpolate(sigma(u)[0,0], V_0))
+        sigma_y.assign(fd.interpolate(sigma(u)[1,1], V_0))
+        sigma_xy.assign(fd.interpolate(sigma(u)[1,1], V_0))
+        # Append axial stress
+        axial_stress.append(.5*(abs(fd.assemble(sigma(u)[1, 1]*fd.ds(3)))+abs(fd.assemble(sigma(u)[1, 1]*fd.ds(4))))/sample_width)
+        radial_stress.append(.5*(abs(fd.assemble(sigma(u)[0, 0]*fd.ds(1)))+abs(fd.assemble(sigma(u)[0, 0]*fd.ds(2))))/sample_height)
+        # Append axial and radial strain
+        axial_strain.append(fd.assemble(u[1]*fd.ds(3) - u[1]*fd.ds(4))/(sample_height*sample_width))
+        radial_strain.append(fd.assemble(u[0]*fd.ds(1) - u[0]*fd.ds(2))/(sample_width*sample_height))
+
+    return axial_strain, radial_strain
