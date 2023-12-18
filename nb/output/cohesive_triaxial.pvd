@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">
+<Collection>
+<DataSet timestep="0" file="cohesive_triaxial_0.vtu" />
+<DataSet timestep="1" file="cohesive_triaxial_1.vtu" />
+<DataSet timestep="2" file="cohesive_triaxial_2.vtu" />
+<DataSet timestep="3" file="cohesive_triaxial_3.vtu" />
+<DataSet timestep="4" file="cohesive_triaxial_4.vtu" />
+<DataSet timestep="5" file="cohesive_triaxial_5.vtu" />
+<DataSet timestep="6" file="cohesive_triaxial_6.vtu" />
+<DataSet timestep="7" file="cohesive_triaxial_7.vtu" />
+<DataSet timestep="8" file="cohesive_triaxial_8.vtu" />
+<DataSet timestep="9" file="cohesive_triaxial_9.vtu" />
+<DataSet timestep="10" file="cohesive_triaxial_10.vtu" />
+<DataSet timestep="11" file="cohesive_triaxial_11.vtu" />
+<DataSet timestep="12" file="cohesive_triaxial_12.vtu" />
+<DataSet timestep="13" file="cohesive_triaxial_13.vtu" />
+<DataSet timestep="14" file="cohesive_triaxial_14.vtu" />
+<DataSet timestep="15" file="cohesive_triaxial_15.vtu" />
+<DataSet timestep="16" file="cohesive_triaxial_16.vtu" />
+<DataSet timestep="17" file="cohesive_triaxial_17.vtu" />
+<DataSet timestep="18" file="cohesive_triaxial_18.vtu" />
+<DataSet timestep="19" file="cohesive_triaxial_19.vtu" />
+<DataSet timestep="20" file="cohesive_triaxial_20.vtu" />
+<DataSet timestep="21" file="cohesive_triaxial_21.vtu" />
+<DataSet timestep="22" file="cohesive_triaxial_22.vtu" />
+<DataSet timestep="23" file="cohesive_triaxial_23.vtu" />
+<DataSet timestep="24" file="cohesive_triaxial_24.vtu" />
+<DataSet timestep="25" file="cohesive_triaxial_25.vtu" />
+<DataSet timestep="26" file="cohesive_triaxial_26.vtu" />
+<DataSet timestep="27" file="cohesive_triaxial_27.vtu" />
+<DataSet timestep="28" file="cohesive_triaxial_28.vtu" />
+<DataSet timestep="29" file="cohesive_triaxial_29.vtu" />
+</Collection>
+</VTKFile>

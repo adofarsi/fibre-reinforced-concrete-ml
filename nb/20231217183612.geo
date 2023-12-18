@@ -1,0 +1,16 @@
+cl__1 = 0.0025;
+Point(0) = {-0.025, -0.05, 0, cl__1};
+Point(1) = {-0.025, 0.05, 0, cl__1};
+Point(2) = {0.025, 0.05, 0, cl__1};
+Point(3) = {0.025, -0.05, 0, cl__1};
+Line(1) = {0, 1};
+Line(2) = {1, 2};
+Line(3) = {2, 3};
+Line(4) = {3, 0};
+Curve Loop(1) = {1, 2, 3, 4};
+Plane Surface(1) = {1};
+Physical Curve(1) = {1};
+Physical Curve(2) = {3};
+Physical Curve(3) = {4};
+Physical Curve(4) = {2};
+Physical Surface(1) = {1};

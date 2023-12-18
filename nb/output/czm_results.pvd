@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">
+<Collection>
+<DataSet timestep="0" file="czm_results_0.vtu" />
+<DataSet timestep="1" file="czm_results_1.vtu" />
+<DataSet timestep="2" file="czm_results_2.vtu" />
+<DataSet timestep="3" file="czm_results_3.vtu" />
+<DataSet timestep="4" file="czm_results_4.vtu" />
+<DataSet timestep="5" file="czm_results_5.vtu" />
+<DataSet timestep="6" file="czm_results_6.vtu" />
+<DataSet timestep="7" file="czm_results_7.vtu" />
+<DataSet timestep="8" file="czm_results_8.vtu" />
+<DataSet timestep="9" file="czm_results_9.vtu" />
+<DataSet timestep="10" file="czm_results_10.vtu" />
+<DataSet timestep="11" file="czm_results_11.vtu" />
+</Collection>
+</VTKFile>
